@@ -1,5 +1,7 @@
 import tkinter as tk
 import time
+from plyer import notification
+
 
 root = tk.Tk()
 
@@ -22,22 +24,15 @@ class app:
         self.timer_button_height = int(0.3 * 200)
 
         #ウィジェット
-        """#self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25),width=10)
         self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25))
-        #self.label.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        self.frame = tk.Frame(self.root)
-        #self.frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        self.button = tk.Button(self.frame,text="スタート",command=self.start_timer,font=("Helvetica",20))
-        self.button.pack(side=tk.LEFT,fill=tk.BOTH, expand=True)
-        self.button2 = tk.Button(self.frame,text="ストップ",font=("Helvetica",20),state=tk.DISABLED, command=self.stop_timer)
-        self.button2.pack(side=tk.RIGHT,fill=tk.BOTH, expand=True)"""
-        #placeテスト
-        self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25))
-        self.label.place(x=0, y=0, width=self.timer_display_width, height=self.timer_display_height)
+        #self.label.place(x=0, y=0, width=self.timer_display_width, height=self.timer_display_height)
+        self.label.place(relx=0, rely=0, relwidth=1, relheight=0.7)
         self.button = tk.Button(root, text="スタート", command=self.start_timer, font=("Helvetica",20))
-        self.button.place(x=0, y=self.timer_display_height, width=self.timer_button_width, height=self.timer_button_height)
+        #self.button.place(x=0, y=self.timer_display_height, width=self.timer_button_width, height=self.timer_button_height)
+        self.button.place(relx=0, rely=0.7, relwidth=0.5, relheight=0.3)
         self.button2 = tk.Button(root, text="ストップ", font=("Helvetica",20), state=tk.DISABLED, command=self.stop_timer)
-        self.button2.place(x=self.timer_button_width, y=self.timer_display_height,width=self.timer_button_width, height=self.timer_button_height)
+        #self.button2.place(x=self.timer_button_width, y=self.timer_display_height,width=self.timer_button_width, height=self.timer_button_height)
+        self.button2.place(relx=0.5, rely=0.7, relwidth=0.5, relheight=0.3)
 
     def start_timer(self):  #スタートボタン機能
         if self.state_pose:
@@ -94,6 +89,7 @@ class app:
         self.state_pose = None
         self.now_count = None
         self.after_id = None
+        self.send_notification()
     
     def restart(self):
         self.toggle_button_label("counting")
@@ -119,6 +115,16 @@ class app:
                 self.button2["text"] = "ストップ"
                 self.button.config(state=tk.NORMAL)
                 self.button2.config(state=tk.DISABLED)
+
+    def send_notification(self):
+        notification.notify(
+            title="ポモドーロタイマー",  # 通知のタイトル
+            message="25分の集中が終わりました！休憩を取りましょう。",  # 通知の内容
+            app_name="Pomodoro Timer",  # アプリ名（任意）
+            timeout=10  # 通知が消えるまでの時間（秒）
+        )
+
+    
 
 App = app(root)
 root.mainloop()
