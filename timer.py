@@ -7,7 +7,7 @@ class app:
     def __init__(self,root):
         self.root = root
         self.title = root.title("タイマー")
-        self.geometry = root.geometry("500x300+0+0")
+        self.geometry = root.geometry("300x200+0+0")
         self.timer = 1  #タイマー時間
         self.pose_limit = 1 #ポーズ中リセットまでのタイムリミット
         self.pose_id = None
@@ -16,16 +16,29 @@ class app:
         self.now_count = None
         self.after_id = None
 
+        self.timer_display_width = int(1 * 300)
+        self.timer_display_height = int(0.7 * 200)
+        self.timer_button_width = int(0.5 * 300)
+        self.timer_button_height = int(0.3 * 200)
+
         #ウィジェット
-        self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25),width=10)
-        self.label.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        """#self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25),width=10)
+        self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25))
+        #self.label.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.frame = tk.Frame(self.root)
-        self.frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        #self.frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
         self.button = tk.Button(self.frame,text="スタート",command=self.start_timer,font=("Helvetica",20))
         self.button.pack(side=tk.LEFT,fill=tk.BOTH, expand=True)
         self.button2 = tk.Button(self.frame,text="ストップ",font=("Helvetica",20),state=tk.DISABLED, command=self.stop_timer)
-        self.button2.pack(side=tk.RIGHT,fill=tk.BOTH, expand=True)
-        
+        self.button2.pack(side=tk.RIGHT,fill=tk.BOTH, expand=True)"""
+        #placeテスト
+        self.label = tk.Label(root, text="タイマー", bg="black", fg="white", font=("Helvetica",25))
+        self.label.place(x=0, y=0, width=self.timer_display_width, height=self.timer_display_height)
+        self.button = tk.Button(root, text="スタート", command=self.start_timer, font=("Helvetica",20))
+        self.button.place(x=0, y=self.timer_display_height, width=self.timer_button_width, height=self.timer_button_height)
+        self.button2 = tk.Button(root, text="ストップ", font=("Helvetica",20), state=tk.DISABLED, command=self.stop_timer)
+        self.button2.place(x=self.timer_button_width, y=self.timer_display_height,width=self.timer_button_width, height=self.timer_button_height)
+
     def start_timer(self):  #スタートボタン機能
         if self.state_pose:
             self.restart()
@@ -34,20 +47,15 @@ class app:
             self.toggle_button_label("counting")
 
     def stop_timer(self):   #ストップボタン機能
-        #タイマーが動いている場合ストップ  関数化する
+        #タイマーが動いている場合ストップ 
         if self.after_id is not None:
             self.state_pose = True
             self.toggle_button_label("posed")
             self.root.after_cancel(self.after_id)
             self.after_id = None
             self.posed(self.pose_limit*60)
-        #もう一度押すとリセット 関数化する
         else:
-            self.state_pose = None
-            self.toggle_button_label("reset")
-            self.now_count = None
-            self.root.after_cancel(self.pose_id)
-            self.after_id = None
+            self.reset()
 
     #一時停止の処理
     def posed(self,pose_count):
@@ -63,12 +71,7 @@ class app:
 
             self.pose_id = self.root.after(1000,self.posed,pose_count -1)
         else:
-            #リセットの処理あとで関数化する
-            self.state_pose = None
-            self.toggle_button_label("reset")
-            self.now_count = None
-            self.root.after_cancel(self.pose_id)
-            self.after_id = None
+            self.reset()
         
             
     #カウントダウン機能
@@ -84,8 +87,14 @@ class app:
             print(f"{self.timer}分経過しました")
             self.label["text"] = "タイマー終了"
             self.button.config(state=tk.NORMAL)
+
+    def reset(self):
+        self.root.after_cancel(self.pose_id)
+        self.toggle_button_label("reset")
+        self.state_pose = None
+        self.now_count = None
+        self.after_id = None
     
-    #タイマーを再開する機能
     def restart(self):
         self.toggle_button_label("counting")
         self.state_pose = False
