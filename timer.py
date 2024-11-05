@@ -22,8 +22,8 @@ class App:
         #コンフィグ読み込み
         self.config = configparser.ConfigParser()
         self.read_config()
-        self.timer = self.config.getint("User_Setting", "work_time")  #タイマー時間
-        self.timer2 = self.config.getint("User_Setting", "break_time")  #休憩時間
+        self.work_time = self.config.getint("User_Setting", "work_time")  #タイマー時間
+        self.break_time = self.config.getint("User_Setting", "break_time")  #休憩時間
         self.pose_limit = self.config.getint("User_Setting", "pause_limit_time") #ポーズ中リセットまでのタイムリミット
         self.timer_cycle = self.config.getint("User_Setting", "timer_cycle") #何回タイマーを繰り返すか
         self.message_window_time = self.config.getint("User_Setting", "message_window_time") #メッセージウィンドウの表示時間
@@ -59,7 +59,7 @@ class App:
         self.style.configure("setting_notice_tab_header.TLabel", font=("Helvetica",15))
         self.style.configure("setting_notice_tab_radiobutton.TRadiobutton", font=("Helvetica",15), relief="ridge",borderwidth=2)
         self.style.configure("setting_tab2.TButton", font=("Helvetica",20))
-        self.style.configure("cycle_label.TLabel", background="white", font=("Helvetica",15))
+        self.style.configure("setting_label.TLabel", background="white", font=("Helvetica",15))
         #タイマーウィジェット
         self.timer_frame = ttk.Frame(self.root)
         self.timer_frame.place(relx=0, rely=0,relwidth=1, relheight=0.25)
@@ -120,7 +120,7 @@ class App:
             if self.cycle_count is None:
                 self.cycle_count = self.timer_cycle
 
-            timer_duration = self.timer * 60 if self.cycle_count % 2 == 0 else self.timer2 * 60
+            timer_duration = self.work_time * 60 if self.cycle_count % 2 == 0 else self.break_time * 60
 
             self.countDown(timer_duration)
             self.toggle_button_label("counting")
@@ -276,10 +276,11 @@ class App:
     def setting_save(self): #変更した設定を保存する
         with open(config_file, "w") as f:
             self.config.write(f)
+        self.apply_setting()
 
     def place_notice_tab(self,setting_frame_R): #ミュート機能のタブを生成
         self.delete_tab()
-        setting_label = ttk.Label(setting_frame_R, text="通知方法を選択してください", style="setting_notice_tab_header.TLabel")
+        mute_setting_label = ttk.Label(setting_frame_R, text="通知方法を選択してください", style="setting_notice_tab_header.TLabel")
         radio1 = ttk.Radiobutton(
                                 setting_frame_R,
                                 variable=self.selected_status,
@@ -294,40 +295,92 @@ class App:
                                 text="通知音あり",
                                 value=False,
                                 command=lambda:self.config.set("User_Setting","mute_status","False"))
-        #save_button = ttk.Button(setting_frame_R, text="設定を保存", style="setting_save_button.TButton", command=self.setting_save)
-        setting_label.place(relx=0, rely=0, relwidth=1, relheight=0.1)
+        display_time_label_left = ttk.Label(setting_frame_R, text="通知ウィンドウの表示時間", style="setting_notice_tab_header.TLabel")
+        display_time_label_center = ttk.Label(setting_frame_R, text=self.message_window_time, style="setting_notice_tab_header.TLabel")
+        display_time_label_right = ttk.Label(setting_frame_R, text="秒", style="setting_notice_tab_header.TLabel")
+        display_time_scale = ttk.Scale(setting_frame_R,
+                                       from_=0,
+                                       to=10,
+                                       orient="horizontal",
+                                       command=lambda event=None : self.change_scale(display_time_label_center, display_time_scale, "User_Setting", "message_window_time"))
+        display_time_scale.set(str(self.message_window_time))
+
+        mute_setting_label.place(relx=0, rely=0, relwidth=1, relheight=0.1)
         radio1.place(relx=0, rely=0.1, relwidth=0.5, relheight=0.2)
         radio2.place(relx=0.5, rely=0.1, relwidth=0.5, relheight=0.2)
-        #save_button.place(relx=0, rely=0.8, relwidth=1, relheight=0.2)
-        self.placed_widgets.append(setting_label)
+        display_time_label_left.place(relx=0, rely=0.3, relwidth=0.7, relheight=0.1)
+        display_time_label_center.place(relx=0.7, rely=0.3, relwidth=0.2, relheight=0.1)
+        display_time_label_right.place(relx=0.9, rely=0.3, relwidth=0.1, relheight=0.1)
+        display_time_scale.place(relx=0, rely=0.4, relwidth=1, relheight=0.1)
+        self.placed_widgets.append(mute_setting_label)
         self.placed_widgets.append(radio1)
         self.placed_widgets.append(radio2)
-        #self.placed_widgets.append(save_button)
+        self.placed_widgets.append(display_time_label_left)
+        self.placed_widgets.append(display_time_label_center)
+        self.placed_widgets.append(display_time_label_right)
+        self.placed_widgets.append(display_time_scale)
         self.place_setting_button(setting_frame_R)
 
 
     def place_pomodoro_tab(self,setting_frame_R): #タイマーに関する設定タブを生成
         self.delete_tab()
         #サイクル
-        cycle_label_left = ttk.Label(setting_frame_R, text="サイクル", style="cycle_label.TLabel")
-        cycle_label_center = ttk.Label(setting_frame_R, text=self.timer_cycle, style="cycle_label.TLabel")
-        cycle_label_right = ttk.Label(setting_frame_R, text="回", style="cycle_label.TLabel")
-        cycle_scale = ttk.Scale(setting_frame_R, from_=1, to=20, orient="horizontal", command=lambda event=None : self.update_cycle_label(cycle_label_center,cycle_scale))
+        cycle_label_left = ttk.Label(setting_frame_R, text="サイクル", style="setting_label.TLabel")
+        cycle_label_center = ttk.Label(setting_frame_R, text=self.timer_cycle, style="setting_label.TLabel")
+        cycle_label_right = ttk.Label(setting_frame_R, text="回", style="setting_label.TLabel")
+        cycle_scale = ttk.Scale(setting_frame_R,
+                                from_=1, to=20,
+                                orient="horizontal",
+                                command=lambda event=None : self.change_scale(cycle_label_center, cycle_scale, "User_Setting", "timer_cycle"))
         cycle_scale.set(str(self.timer_cycle))
         cycle_label_left.place(relx=0, rely=0, relwidth=0.7, relheight=0.1)
         cycle_label_center.place(relx=0.7, rely=0, relwidth=0.2, relheight=0.1)
         cycle_label_right.place(relx=0.9, rely=0, relwidth=0.1, relheight=0.1)
         cycle_scale.place(relx=0, rely=0.1, relwidth=1, relheight=0.1)
+        #作業時間
+        work_time_label_left = ttk.Label(setting_frame_R, text="作業時間", style="setting_label.TLabel")
+        work_time_label_center = ttk.Label(setting_frame_R, text=self.work_time, style="setting_label.TLabel")
+        work_time_label_right = ttk.Label(setting_frame_R, text="分", style="setting_label.TLabel")
+        work_time_scale = ttk.Scale(setting_frame_R,
+                                    from_=1,
+                                    to=60,
+                                    orient="horizontal")
+        work_time_scale.set(self.work_time)
+        work_time_label_left.place(relx=0, rely=0.2, relwidth=0.7, relheight=0.1)
+        work_time_label_center.place(relx=0.7, rely=0.2, relwidth=0.2, relheight=0.1)
+        work_time_label_right.place(relx=0.9, rely=0.2, relwidth=0.1, relheight=0.1)
+        work_time_scale.place(relx=0, rely=0.3, relwidth=1, relheight=0.1)
+        #休憩時間
+        break_time_label_left = ttk.Label(setting_frame_R, text="休憩時間", style="setting_label.TLabel")
+        break_time_label_center = ttk.Label(setting_frame_R, text=self.break_time, style="setting_label.TLabel")
+        break_time_label_right = ttk.Label(setting_frame_R, text="分", style="setting_label.TLabel")
+        break_time_scale = ttk.Scale(setting_frame_R,
+                                     from_=1,
+                                     to=30,
+                                     orient="horizontal")
+        break_time_scale.set(self.break_time)
+        break_time_label_left.place(relx=0, rely=0.4, relwidth=0.7, relheight=0.1)
+        break_time_label_center.place(relx=0.7, rely=0.4, relwidth=0.2, relheight=0.1)
+        break_time_label_right.place(relx=0.9, rely=0.4, relwidth=0.1, relheight=0.1)
+        break_time_scale.place(relx=0, rely=0.5, relwidth=1, relheight=0.1)
 
         self.placed_widgets.append(cycle_label_left)
         self.placed_widgets.append(cycle_label_center)
         self.placed_widgets.append(cycle_label_right)
         self.placed_widgets.append(cycle_scale)
+        self.placed_widgets.append(work_time_label_left)
+        self.placed_widgets.append(work_time_label_center)
+        self.placed_widgets.append(work_time_label_right)
+        self.placed_widgets.append(work_time_scale)
+        self.placed_widgets.append(break_time_label_left)
+        self.placed_widgets.append(break_time_label_center)
+        self.placed_widgets.append(break_time_label_right)
+        self.placed_widgets.append(break_time_scale)
         self.place_setting_button(setting_frame_R)
 
-    def update_cycle_label(self,cycle_label_center,cycle_scale): #サイクルの変更をラベルに反映
-        cycle_label_center.config(text=int(cycle_scale.get()))
-        self.config.set("User_Setting", "timer_cycle", f"{int(cycle_scale.get())}")
+    def change_scale(self, label, scale, section, key): #スケールの変更を反映
+        label.config(text=int(scale.get()))
+        self.config.set(section, key, f"{int(scale.get())}")
 
     def place_setting_button(self,frame):
         save_button = ttk.Button(frame, text="設定を保存", style="setting_save_button.TButton", command=self.setting_save)
@@ -342,6 +395,14 @@ class App:
         self.setting_window.destroy()
         self.setting_window = None
         self.placed_widgets = []
+
+    def apply_setting(self):
+        self.work_time = self.config.getint("User_Setting", "work_time")  #タイマー時間
+        self.break_time = self.config.getint("User_Setting", "break_time")  #休憩時間
+        self.pose_limit = self.config.getint("User_Setting", "pause_limit_time") #ポーズ中リセットまでのタイムリミット
+        self.timer_cycle = self.config.getint("User_Setting", "timer_cycle") #何回タイマーを繰り返すか
+        self.message_window_time = self.config.getint("User_Setting", "message_window_time")
+        self.mute_status = self.config.getboolean("User_Setting", "mute_status") #ミュートかどうか
 
     def notice_sound(self): #通知音の設定
         selected = self.selected_status.get()
