@@ -27,6 +27,9 @@ class App:
         self.pose_limit = self.config.getint("User_Setting", "pause_limit_time") #ポーズ中リセットまでのタイムリミット
         self.timer_cycle = self.config.getint("User_Setting", "timer_cycle") #何回タイマーを繰り返すか
         self.message_window_time = self.config.getint("User_Setting", "message_window_time") #メッセージウィンドウの表示時間
+        self.default_color = self.config.get("User_Setting", "default_color")
+        self.work_color = self.config.get("User_Setting", "work_color")
+        self.break_color = self.config.get("User_Setting", "break_color")
         self.cycle_count = None
         self.pose_id = None
         self.root.resizable(False,False)
@@ -42,32 +45,29 @@ class App:
         self.date = None    #タイマー開始時の日付
         self.start_datetime = None  #記録のサイクルのキーに使う
         self.stop_datetime = None 
+        self.log_color = None #ログの背景色の判断用
         self.entries = []  #日付の重複確認リスト
         self.placed_widgets = []
         #ウィンドウが閉じるときの動作
         self.root.protocol("WM_DELETE_WINDOW",self.app_end) #保存機能が出来れば、終了時に保存するようにする
         #スタイル
         self.style = ttk.Style()
+        self.style.configure("TButton", background="white", relife="flat", font=("Helvetica",20))
         self.style.configure("timer_display.TLabel",background="black",foreground="white",font=("Helvetica",25))
-        self.style.configure("timer_button.TButton",font=("Helvetica",20))
         self.style.configure("log.TFrame", background="skyblue")
-        self.style.configure("footer_button.TButton", font=("Helvetica",20))
         self.style.configure("setting_frame_L.TFrame", background="gray")
         self.style.configure("setting_frame_R.TFrame", background="#ede4e1")
-        self.style.configure("setting_save_button.TButton", font=("Helvetica",20), relife="flat")
-        self.style.configure("setting_tab1.TButton", font=("Helvetica",20))
         self.style.configure("setting_notice_tab_header.TLabel", font=("Helvetica",15))
         self.style.configure("setting_notice_tab_radiobutton.TRadiobutton", font=("Helvetica",15), relief="ridge",borderwidth=2)
-        self.style.configure("setting_tab2.TButton", font=("Helvetica",20))
         self.style.configure("setting_label.TLabel", background="white", font=("Helvetica",15))
         #タイマーウィジェット
         self.timer_frame = ttk.Frame(self.root)
         self.timer_frame.place(relx=0, rely=0,relwidth=1, relheight=0.25)
         self.label = ttk.Label(self.timer_frame, text="タイマー", anchor="center", style="timer_display.TLabel")
         self.label.place(relx=0, rely=0, relwidth=1, relheight=0.7)
-        self.button = ttk.Button(self.timer_frame, text="スタート", command=lambda: self.start_timer(), style="timer_button.TButton")
+        self.button = ttk.Button(self.timer_frame, text="スタート", command=lambda: self.start_timer(), style="TButton")
         self.button.place(relx=0, rely=0.7, relwidth=0.5, relheight=0.3)
-        self.button2 = ttk.Button(self.timer_frame, text="ストップ", command=self.stop_timer, state=tk.DISABLED, style="timer_button.TButton")
+        self.button2 = ttk.Button(self.timer_frame, text="ストップ", command=self.stop_timer, state=tk.DISABLED, style="TButton")
         self.button2.place(relx=0.5, rely=0.7, relwidth=0.5, relheight=0.3)
         #ログウィジェット
         self.log_frame= ttk.Frame(self.root, style="log.TFrame")
@@ -85,12 +85,15 @@ class App:
         self.log_list.config(yscrollcommand=self.scrollbar.set)
         self.log_list.bind("<Button-1>", self.disable_resize)
         self.log_list.bind("<B1-Motion>", self.disable_resize)
+        self.log_list.tag_configure("Default_Color", background=self.default_color)
+        self.log_list.tag_configure("Work", background=self.work_color)
+        self.log_list.tag_configure("Break", background=self.break_color)
         #フッターウィジェット
         self.footer_frame = ttk.Frame(self.root)
         self.footer_frame.place(relx=0, rely=0.9, relwidth=1, relheight=0.1)
-        self.exit_button = ttk.Button(self.footer_frame, text="Exit", command=self.app_end, style="footer_button.TButton")
+        self.exit_button = ttk.Button(self.footer_frame, text="Exit", command=self.app_end, style="TButton")
         self.exit_button.place(relx=0, rely=0, relwidth=0.75, relheight=1)
-        self.setting_button = ttk.Button(self.footer_frame, text="設定", style="footer_button.TButton", command=self.call_setting_window)
+        self.setting_button = ttk.Button(self.footer_frame, text="設定", style="TButton", command=self.call_setting_window)
         self.setting_button.place(relx=0.75, rely=0, relwidth=0.25, relheight=1)
         #子ウィンドウ
         self.message_window = None
@@ -120,12 +123,22 @@ class App:
             if self.cycle_count is None:
                 self.cycle_count = self.timer_cycle
 
-            timer_duration = self.work_time * 60 if self.cycle_count % 2 == 0 else self.break_time * 60
+            #timer_duration = self.work_time * 60 if self.cycle_count % 2 == 0 else self.break_time * 60
+
+            timer_duration = self.get_duration()
 
             self.countDown(timer_duration)
             self.toggle_button_label("counting")
             self.start_datetime = self.get_current_time()
             self.date = self.get_current_date()
+
+    def get_duration(self): #お試し
+        if self.cycle_count % 2 == 0:
+            self.log_color = "Work"
+            return self.work_time * 60
+        else:
+            self.log_color = "Break"
+            return self.break_time * 60
 
     def stop_timer(self):   #ストップボタン機能
         if self.after_id is not None:
@@ -163,7 +176,7 @@ class App:
             self.toggle_button_label("complete")
             self.cycle_count -= 1
             self.stop_datetime = self.get_current_time()
-            self.data_loading(self.date,self.start_datetime,self.stop_datetime)
+            self.data_loading(self.date,self.start_datetime,self.stop_datetime,self.log_color)
             self.record_save()
             if self.cycle_count == 0:
                 self.toggle_button_label("reset")
@@ -178,7 +191,7 @@ class App:
             self.state_pose = False
             self.now_count = None
             self.after_id = None
-            self.data_loading(self.date,self.start_datetime,self.stop_datetime)
+            self.data_loading(self.date,self.start_datetime,self.stop_datetime,self.log_color)
             self.record_save()
             self.date = None
             self.start_datetime = None
@@ -263,9 +276,9 @@ class App:
         setting_frame_R = ttk.Frame(self.setting_window, style="setting_frame_R.TFrame") #詳細
         setting_frame_R.place(relx=0.3, rely=0, relwidth=0.7, relheight=1)
         #タブ選択ボタン
-        setting_button1 = ttk.Button(setting_frame_L, text="通知方法", style="setting_tab1.TButton", command=lambda : self.place_notice_tab(setting_frame_R))
+        setting_button1 = ttk.Button(setting_frame_L, text="通知方法", style="TButton", command=lambda : self.place_notice_tab(setting_frame_R))
         setting_button1.place(relx=0, rely=0, relwidth=1, relheight=0.2)
-        setting_button2 = ttk.Button(setting_frame_L, text="時間設定", style="setting_tab2.TButton", command=lambda : self.place_pomodoro_tab(setting_frame_R))
+        setting_button2 = ttk.Button(setting_frame_L, text="時間設定", style="TButton", command=lambda : self.place_pomodoro_tab(setting_frame_R))
         setting_button2.place(relx=0, rely=0.2, relwidth=1, relheight=0.2)
         #初期表示
         self.place_notice_tab(setting_frame_R)
@@ -344,7 +357,8 @@ class App:
         work_time_scale = ttk.Scale(setting_frame_R,
                                     from_=1,
                                     to=60,
-                                    orient="horizontal")
+                                    orient="horizontal",
+                                    command=lambda event=None : self.change_scale(work_time_label_center, work_time_scale, "User_Setting", "work_time"))
         work_time_scale.set(self.work_time)
         work_time_label_left.place(relx=0, rely=0.2, relwidth=0.7, relheight=0.1)
         work_time_label_center.place(relx=0.7, rely=0.2, relwidth=0.2, relheight=0.1)
@@ -357,7 +371,8 @@ class App:
         break_time_scale = ttk.Scale(setting_frame_R,
                                      from_=1,
                                      to=30,
-                                     orient="horizontal")
+                                     orient="horizontal",
+                                     command=lambda event=None : self.change_scale(break_time_label_center, break_time_scale, "User_Setting", "break_time"))
         break_time_scale.set(self.break_time)
         break_time_label_left.place(relx=0, rely=0.4, relwidth=0.7, relheight=0.1)
         break_time_label_center.place(relx=0.7, rely=0.4, relwidth=0.2, relheight=0.1)
@@ -382,10 +397,10 @@ class App:
         label.config(text=int(scale.get()))
         self.config.set(section, key, f"{int(scale.get())}")
 
-    def place_setting_button(self,frame):
-        save_button = ttk.Button(frame, text="設定を保存", style="setting_save_button.TButton", command=self.setting_save)
+    def place_setting_button(self,frame): #設定保存ボタン機能
+        save_button = ttk.Button(frame, text="設定を保存", style="TButton", command=self.setting_save)
         save_button.place(relx=0, rely=0.8, relwidth=1, relheight=0.2)
-        self.placed_widgets.append(save_button)
+        self.placed_widgets.append(save_button) #設置ウィジェットリストに追加
 
     def delete_tab(self): #タブを削除
         for w in self.placed_widgets:
@@ -396,15 +411,18 @@ class App:
         self.setting_window = None
         self.placed_widgets = []
 
-    def apply_setting(self):
+    def apply_setting(self): #設定ファイルから再読み込み
         self.work_time = self.config.getint("User_Setting", "work_time")  #タイマー時間
         self.break_time = self.config.getint("User_Setting", "break_time")  #休憩時間
         self.pose_limit = self.config.getint("User_Setting", "pause_limit_time") #ポーズ中リセットまでのタイムリミット
         self.timer_cycle = self.config.getint("User_Setting", "timer_cycle") #何回タイマーを繰り返すか
         self.message_window_time = self.config.getint("User_Setting", "message_window_time")
         self.mute_status = self.config.getboolean("User_Setting", "mute_status") #ミュートかどうか
+        self.default_color = self.config.get("User_Setting", "default_color")
+        self.work_color = self.config.get("User_Setting", "work_color")
+        self.break_color = self.config.get("User_Setting", "break_color")
 
-    def notice_sound(self): #通知音の設定
+    def notice_sound(self): #通知音の判別
         selected = self.selected_status.get()
         print(selected)
         if selected:
@@ -459,10 +477,11 @@ class App:
             if file.tell() == 0:    #何もデータが無ければリストの名前を最初に入力する
                 writer.writerow(["日付","開始時間","終了時間"])
 
-            writer.writerow([self.date,self.start_datetime,self.stop_datetime])
+            writer.writerow([self.date,self.start_datetime,self.stop_datetime,self.log_color])
         self.date = None
         self.start_datetime = None
         self.stop_datetime = None
+        self.log_color = None
 
     def read_csv(self): #csvデータを読み込み
         if not os.path.exists(csv_file):
@@ -474,20 +493,21 @@ class App:
                 reader = csv.reader(file)
                 next(reader)
                 for row in reader:
-                    self.data_loading(row[0], row[1], row[2])
+                    value3 = row[3] if len(row) > 3 else "Default_Color"
+                    self.data_loading(row[0], row[1], row[2], value3)
         except Exception as e:
             print(f"エラーが発生しました：{e}")
 
-    def data_loading(self,date,start,stop): #ログに表示
+    def data_loading(self,date,start,stop,tag): #ログ欄に表示
         date_obj =  datetime.strptime(date, "%Y-%m-%d").date()
         date = date_obj.strftime("%Y-%m-%d")
 
         same_date_entries = [entry for entry in self.entries if entry[0] == date]
 
         if len(same_date_entries) == 0:
-            self.log_list.insert("", "end", values=(date, start, stop))
+            self.log_list.insert("", "end", values=(date, start, stop), tags=(tag,))
         else:
-            self.log_list.insert("", "end", values=("", start, stop))
+            self.log_list.insert("", "end", values=("", start, stop), tags=(tag,))
 
         self.entries.append((date, self.log_list.get_children()[-1] if self.log_list.get_children() else None))
 
