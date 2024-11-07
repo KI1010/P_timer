@@ -7,6 +7,7 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+from tkinter import colorchooser
 
 root = tk.Tk()
 csv_file = "time_record.csv" #保存するファイルの名前と場所
@@ -47,12 +48,15 @@ class App:
         self.stop_datetime = None 
         self.log_color = None #ログの背景色の判断用
         self.entries = []  #日付の重複確認リスト
+        self.selected_color1 = None
+        self.selected_color2 = None
         self.placed_widgets = []
         #ウィンドウが閉じるときの動作
         self.root.protocol("WM_DELETE_WINDOW",self.app_end) #保存機能が出来れば、終了時に保存するようにする
         #スタイル
         self.style = ttk.Style()
-        self.style.configure("TButton", background="white", relife="flat", font=("Helvetica",20))
+        self.style.configure("TButton", background="white", font=("Helvetica",20))
+        self.style.configure("small.TButton", font=("Helvetica",15))
         self.style.configure("timer_display.TLabel",background="black",foreground="white",font=("Helvetica",25))
         self.style.configure("log.TFrame", background="skyblue")
         self.style.configure("setting_frame_L.TFrame", background="gray")
@@ -272,24 +276,21 @@ class App:
         self.setting_window.geometry("500x300+0+0")
 
         setting_frame_L = ttk.Frame(self.setting_window, style="setting_frame_L.TFrame") #カテゴリ
+        setting_frame_R = ttk.Frame(self.setting_window, style="setting_frame_R.TFrame") #詳細欄
         setting_frame_L.place(relx=0, rely=0, relwidth=0.3, relheight=1)
-        setting_frame_R = ttk.Frame(self.setting_window, style="setting_frame_R.TFrame") #詳細
         setting_frame_R.place(relx=0.3, rely=0, relwidth=0.7, relheight=1)
         #タブ選択ボタン
         setting_button1 = ttk.Button(setting_frame_L, text="通知方法", style="TButton", command=lambda : self.place_notice_tab(setting_frame_R))
-        setting_button1.place(relx=0, rely=0, relwidth=1, relheight=0.2)
         setting_button2 = ttk.Button(setting_frame_L, text="時間設定", style="TButton", command=lambda : self.place_pomodoro_tab(setting_frame_R))
+        setting_button3 = ttk.Button(setting_frame_L, text="表示設定", style="TButton", command=lambda : self.place_display_tab(setting_frame_R))
+        setting_button1.place(relx=0, rely=0,   relwidth=1, relheight=0.2)
         setting_button2.place(relx=0, rely=0.2, relwidth=1, relheight=0.2)
+        setting_button3.place(relx=0, rely=0.4, relwidth=1, relheight=0.2)
         #初期表示
         self.place_notice_tab(setting_frame_R)
         #ウィンドウを一つのみにするための設定
         self.setting_window.protocol("WM_DELETE_WINDOW", self.setting_window_close)
         #タイマー時間の設定
-
-    def setting_save(self): #変更した設定を保存する
-        with open(config_file, "w") as f:
-            self.config.write(f)
-        self.apply_setting()
 
     def place_notice_tab(self,setting_frame_R): #ミュート機能のタブを生成
         self.delete_tab()
@@ -333,7 +334,6 @@ class App:
         self.placed_widgets.append(display_time_label_right)
         self.placed_widgets.append(display_time_scale)
         self.place_setting_button(setting_frame_R)
-
 
     def place_pomodoro_tab(self,setting_frame_R): #タイマーに関する設定タブを生成
         self.delete_tab()
@@ -393,6 +393,54 @@ class App:
         self.placed_widgets.append(break_time_scale)
         self.place_setting_button(setting_frame_R)
 
+    def place_display_tab(self,setting_frame_R):
+        self.delete_tab()
+        work_time_color_label = ttk.Label(setting_frame_R, text="作業時間の背景色", style="setting_label.TLabel")
+        work_time_color_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid")
+        break_time_color_label = ttk.Label(setting_frame_R, text="休憩時間の背景色", style="setting_label.TLabel")
+        break_time_color_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid")
+        work_color_selection_button = ttk.Button(setting_frame_R, text="作業時間の\n色を選択", style="small.TButton", command=self.selecting_color)
+        break_color_selection_button = ttk.Button(setting_frame_R, text="休憩時間の\n色を選択", style="small.TButton", command=self.selecting_color)
+
+        work_time_color_sample.config(background=self.work_color)
+        break_time_color_sample.config(background=self.break_color)
+
+        work_time_color_label.place(relx=0, rely=0, relwidth=0.8, relheight=0.2)
+        work_time_color_sample.place(relx=0.8, rely=0, relwidth=0.2, relheight=0.2)
+        break_time_color_label.place(relx=0, rely=0.2, relwidth=0.8, relheight=0.2)
+        break_time_color_sample.place(relx=0.8, rely=0.2, relwidth=0.2, relheight=0.2)
+        work_color_selection_button.place(relx=0, rely=0.4, relwidth=0.5, relheight=0.2)
+        break_color_selection_button.place(relx=0.5, rely=0.4, relwidth=0.5, relheight=0.2)
+
+        self.placed_widgets.append(work_time_color_label)
+        self.placed_widgets.append(work_time_color_sample)
+        self.placed_widgets.append(break_time_color_label)
+        self.placed_widgets.append(break_time_color_sample)
+        self.placed_widgets.append(work_color_selection_button)
+        self.placed_widgets.append(break_color_selection_button)
+        self.place_setting_button(setting_frame_R)
+        None
+
+    @property
+    def color1(self):
+        return self.selected_color1
+    @property
+    def color2(self):
+        return self.selected_color2
+    @color1.setter
+    def color1(self,new_color):
+        #work_color_sample = 
+        None
+
+    def selecting_color(self):
+        color_code = colorchooser.askcolor(title="色を選択してください")
+        if color_code[1]:
+            None#色を返す
+
+    def apply_sample_color(self):
+        None
+
+
     def change_scale(self, label, scale, section, key): #スケールの変更を反映
         label.config(text=int(scale.get()))
         self.config.set(section, key, f"{int(scale.get())}")
@@ -401,6 +449,11 @@ class App:
         save_button = ttk.Button(frame, text="設定を保存", style="TButton", command=self.setting_save)
         save_button.place(relx=0, rely=0.8, relwidth=1, relheight=0.2)
         self.placed_widgets.append(save_button) #設置ウィジェットリストに追加
+
+    def setting_save(self): #変更した設定を保存する
+        with open(config_file, "w") as f:
+            self.config.write(f)
+        self.apply_setting()
 
     def delete_tab(self): #タブを削除
         for w in self.placed_widgets:
