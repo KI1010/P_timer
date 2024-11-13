@@ -103,6 +103,8 @@ class App:
         #子ウィンドウ
         self.message_window = None
         self.setting_window = None
+        self.work_time_color_before_sample = None
+        self.break_time_color_before_sample = None
         #過去ログ読み込み
         self.read_csv()
 
@@ -432,6 +434,7 @@ class App:
         self.place_setting_button(setting_frame_R)
 
     def place_reset_tab(self,setting_flame_R):
+        self.delete_tab()
         reset_label1 = ttk.Label(setting_flame_R, style="small.TLabel", text="通知ウィンドウの表示時間")
         reset_label2 = ttk.Label(setting_flame_R, style="small.TLabel", text="サイクル")
         reset_label3 = ttk.Label(setting_flame_R, style="small.TLabel", text="作業時間")
@@ -439,12 +442,12 @@ class App:
         reset_label5 = ttk.Label(setting_flame_R, style="small.TLabel", text="作業時間背景色")
         reset_label6 = ttk.Label(setting_flame_R, style="small.TLabel", text="休憩時間背景色")
 
-        reset_button1 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
-        reset_button2 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
-        reset_button3 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
-        reset_button4 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
-        reset_button5 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
-        reset_button6 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+        reset_button1 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton", command=lambda : self.setting_reset("message_window_time"))
+        reset_button2 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton", command=lambda : self.setting_reset("timer_cycle"))
+        reset_button3 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton", command=lambda : self.setting_reset("work_time"))
+        reset_button4 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton", command=lambda : self.setting_reset("break_time"))
+        reset_button5 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton", command=lambda : self.setting_reset("work_color"))
+        reset_button6 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton", command=lambda : self.setting_reset("break_color"))
 
         reset_label1.place(relx=0, rely=0,    relwidth=0.7, relheight=0.15)
         reset_label2.place(relx=0, rely=0.15, relwidth=0.7, relheight=0.15)
@@ -459,7 +462,26 @@ class App:
         reset_button4.place(relx=0.7, rely=0.45, relwidth=0.3, relheight=0.15)
         reset_button5.place(relx=0.7, rely=0.6,  relwidth=0.3, relheight=0.15)
         reset_button6.place(relx=0.7, rely=0.75, relwidth=0.3, relheight=0.15)
-        self.delete_tab()
+
+        self.placed_widgets.append(reset_label1)
+        self.placed_widgets.append(reset_label2)
+        self.placed_widgets.append(reset_label3)
+        self.placed_widgets.append(reset_label4)
+        self.placed_widgets.append(reset_label5)
+        self.placed_widgets.append(reset_label6)
+        self.placed_widgets.append(reset_button1)
+        self.placed_widgets.append(reset_button2)
+        self.placed_widgets.append(reset_button3)
+        self.placed_widgets.append(reset_button4)
+        self.placed_widgets.append(reset_button5)
+        self.placed_widgets.append(reset_button6)
+
+    def setting_reset(self, target):
+        default_data = self.config.get("DEFAULT",target)
+        print(target +":"+ default_data)
+        self.config.set("User_Setting", target, default_data)
+        self.setting_save()
+
 
     def selecting_color(self, preview, current_mode):
         color_code = colorchooser.askcolor(title="色を選択してください")
@@ -481,8 +503,9 @@ class App:
     def apply_tag_color(self): #色の変更を反映
         self.log_list.tag_configure("Work", background=self.work_color)
         self.log_list.tag_configure("Break", background=self.break_color)
-        self.work_time_color_before_sample.config(background=self.work_color)
-        self.break_time_color_before_sample.config(background=self.break_color)
+        if self.work_time_color_before_sample != None:
+            self.work_time_color_before_sample.config(background=self.work_color)
+            self.break_time_color_before_sample.config(background=self.break_color)
 
     def change_scale(self, label, scale, section, key): #スケールの変更を反映
         label.config(text=int(scale.get()))
