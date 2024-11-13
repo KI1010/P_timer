@@ -281,12 +281,14 @@ class App:
         setting_frame_L.place(relx=0, rely=0, relwidth=0.3, relheight=1)
         setting_frame_R.place(relx=0.3, rely=0, relwidth=0.7, relheight=1)
         #タブ選択ボタン
-        setting_button1 = ttk.Button(setting_frame_L, text="通知方法", style="TButton", command=lambda : self.place_notice_tab(setting_frame_R))
+        setting_button1 = ttk.Button(setting_frame_L, text="通知設定", style="TButton", command=lambda : self.place_notice_tab(setting_frame_R))
         setting_button2 = ttk.Button(setting_frame_L, text="時間設定", style="TButton", command=lambda : self.place_pomodoro_tab(setting_frame_R))
         setting_button3 = ttk.Button(setting_frame_L, text="表示設定", style="TButton", command=lambda : self.place_display_tab(setting_frame_R))
+        setting_button4 = ttk.Button(setting_frame_L, text="リセット", style="TButton", command=lambda : self.place_reset_tab(setting_frame_R))
         setting_button1.place(relx=0, rely=0,   relwidth=1, relheight=0.2)
         setting_button2.place(relx=0, rely=0.2, relwidth=1, relheight=0.2)
         setting_button3.place(relx=0, rely=0.4, relwidth=1, relheight=0.2)
+        setting_button4.place(relx=0, rely=0.6, relwidth=1, relheight=0.2)
         #初期表示
         self.place_notice_tab(setting_frame_R)
         #ウィンドウを一つのみにするための設定
@@ -397,61 +399,90 @@ class App:
     def place_display_tab(self,setting_frame_R):
         self.delete_tab()
         work_time_color_label = ttk.Label(setting_frame_R, text="作業時間の背景色", style="setting_label.TLabel")
-        work_time_color_before_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="今の色", anchor="center")
+        self.work_time_color_before_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="今の色", anchor="center")
         work_time_color_after_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="新しい色", anchor="center")
 
         break_time_color_label = ttk.Label(setting_frame_R, text="休憩時間の背景色", style="setting_label.TLabel")
-        break_time_color_before_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="今の色", anchor="center")
+        self.break_time_color_before_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="今の色", anchor="center")
         break_time_color_after_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="新しい色", anchor="center")
 
-        work_color_selection_button = ttk.Button(setting_frame_R, text="作業時間の\n色を選択", style="small.TButton", command=lambda : self.selecting_color(work_time_color_after_sample))
-        break_color_selection_button = ttk.Button(setting_frame_R, text="休憩時間の\n色を選択", style="small.TButton", command=self.selecting_color)
+        work_color_selection_button = ttk.Button(setting_frame_R, text="作業時間の\n色を選択", style="small.TButton", command=lambda : self.selecting_color(work_time_color_after_sample, "work"))
+        break_color_selection_button = ttk.Button(setting_frame_R, text="休憩時間の\n色を選択", style="small.TButton", command=lambda : self.selecting_color(break_time_color_after_sample, "break"))
 
-        work_time_color_before_sample.config(background=self.work_color)
-        break_time_color_before_sample.config(background=self.break_color)
+        self.work_time_color_before_sample.config(background=self.work_color) #今適応されている色に設定
+        self.break_time_color_before_sample.config(background=self.break_color)
 
         work_time_color_label.place(relx=0, rely=0, relwidth=0.6, relheight=0.2)
-        work_time_color_before_sample.place(relx=0.6, rely=0, relwidth=0.2, relheight=0.2)
+        self.work_time_color_before_sample.place(relx=0.6, rely=0, relwidth=0.2, relheight=0.2)
         work_time_color_after_sample.place(relx=0.8, rely=0, relwidth=0.2, relheight=0.2)
         break_time_color_label.place(relx=0, rely=0.2, relwidth=0.6, relheight=0.2)
-        break_time_color_before_sample.place(relx=0.6, rely=0.2, relwidth=0.2, relheight=0.2)
+        self.break_time_color_before_sample.place(relx=0.6, rely=0.2, relwidth=0.2, relheight=0.2)
         break_time_color_after_sample.place(relx=0.8, rely=0.2, relwidth=0.2, relheight=0.2)
         work_color_selection_button.place(relx=0, rely=0.4, relwidth=0.5, relheight=0.2)
         break_color_selection_button.place(relx=0.5, rely=0.4, relwidth=0.5, relheight=0.2)
 
         self.placed_widgets.append(work_time_color_label)
-        self.placed_widgets.append(work_time_color_before_sample)
+        self.placed_widgets.append(self.work_time_color_before_sample)
         self.placed_widgets.append(work_time_color_after_sample)
         self.placed_widgets.append(break_time_color_label)
-        self.placed_widgets.append(break_time_color_before_sample)
+        self.placed_widgets.append(self.break_time_color_before_sample)
         self.placed_widgets.append(break_time_color_after_sample)
         self.placed_widgets.append(work_color_selection_button)
         self.placed_widgets.append(break_color_selection_button)
         self.place_setting_button(setting_frame_R)
 
-    @property
-    def color1(self): #self.selected_color1のゲッター
-        return self.selected_color1
-    @property
-    def color2(self): #self.selected_color2のゲッター
-        return self.selected_color2
-    @color1.setter
-    def color1(self,new_color): #self.selected_colorのセッター
-        self.selected_color1 = new_color 
-        None
+    def place_reset_tab(self,setting_flame_R):
+        reset_label1 = ttk.Label(setting_flame_R, style="small.TLabel", text="通知ウィンドウの表示時間")
+        reset_label2 = ttk.Label(setting_flame_R, style="small.TLabel", text="サイクル")
+        reset_label3 = ttk.Label(setting_flame_R, style="small.TLabel", text="作業時間")
+        reset_label4 = ttk.Label(setting_flame_R, style="small.TLabel", text="休憩時間")
+        reset_label5 = ttk.Label(setting_flame_R, style="small.TLabel", text="作業時間背景色")
+        reset_label6 = ttk.Label(setting_flame_R, style="small.TLabel", text="休憩時間背景色")
 
-    def selecting_color(self, preview):
+        reset_button1 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+        reset_button2 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+        reset_button3 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+        reset_button4 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+        reset_button5 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+        reset_button6 = ttk.Button(setting_flame_R, text="リセット", style="small.TButton")
+
+        reset_label1.place(relx=0, rely=0,    relwidth=0.7, relheight=0.15)
+        reset_label2.place(relx=0, rely=0.15, relwidth=0.7, relheight=0.15)
+        reset_label3.place(relx=0, rely=0.3,  relwidth=0.7, relheight=0.15)
+        reset_label4.place(relx=0, rely=0.45, relwidth=0.7, relheight=0.15)
+        reset_label5.place(relx=0, rely=0.6,  relwidth=0.7, relheight=0.15)
+        reset_label6.place(relx=0, rely=0.75, relwidth=0.7, relheight=0.15)
+
+        reset_button1.place(relx=0.7, rely=0,    relwidth=0.3, relheight=0.15)
+        reset_button2.place(relx=0.7, rely=0.15, relwidth=0.3, relheight=0.15)
+        reset_button3.place(relx=0.7, rely=0.3,  relwidth=0.3, relheight=0.15)
+        reset_button4.place(relx=0.7, rely=0.45, relwidth=0.3, relheight=0.15)
+        reset_button5.place(relx=0.7, rely=0.6,  relwidth=0.3, relheight=0.15)
+        reset_button6.place(relx=0.7, rely=0.75, relwidth=0.3, relheight=0.15)
+        self.delete_tab()
+
+    def selecting_color(self, preview, current_mode):
         color_code = colorchooser.askcolor(title="色を選択してください")
         if color_code[1]:
-            self.selected_color1 = color_code[1]
-            preview.config(background=self.selected_color1)
+            if current_mode == "work":
+                self.selected_color1 = color_code[1]
+                preview.config(background=self.selected_color1)
+                self.config.set("User_Setting", "work_color", self.selected_color1)
+            elif current_mode == "break":
+                self.selected_color2 = color_code[1]
+                preview.config(background=self.selected_color2)
+                self.config.set("User_Setting", "break_color", self.selected_color2)
+            else:
+                print("current_modeの値が不正です")
         else:
             print("色の変更をキャンセルしました")
         self.setting_window.lift() #設定ウィンドウが後ろに行くのを防ぐ
 
-    def apply_sample_color(self):
-        None
-
+    def apply_tag_color(self): #色の変更を反映
+        self.log_list.tag_configure("Work", background=self.work_color)
+        self.log_list.tag_configure("Break", background=self.break_color)
+        self.work_time_color_before_sample.config(background=self.work_color)
+        self.break_time_color_before_sample.config(background=self.break_color)
 
     def change_scale(self, label, scale, section, key): #スケールの変更を反映
         label.config(text=int(scale.get()))
@@ -466,6 +497,7 @@ class App:
         with open(config_file, "w") as f:
             self.config.write(f)
         self.apply_setting()
+        self.apply_tag_color()
 
     def delete_tab(self): #タブを削除
         for w in self.placed_widgets:
@@ -562,8 +594,9 @@ class App:
                     self.data_loading(row[0], row[1], row[2], value3)
         except Exception as e:
             print(f"エラーが発生しました：{e}")
+        self.log_list.yview_moveto(1) #初期位置を下に
 
-    def data_loading(self,date,start,stop,tag): #ログ欄に表示
+    def data_loading(self,date,start,stop,tag): #ログの最後にデータを追加
         date_obj =  datetime.strptime(date, "%Y-%m-%d").date()
         date = date_obj.strftime("%Y-%m-%d")
 
