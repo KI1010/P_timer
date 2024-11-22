@@ -2,6 +2,7 @@ import os
 import time
 import csv
 import configparser
+import pygame
 from datetime import datetime
 
 import tkinter as tk
@@ -12,6 +13,14 @@ from tkinter import colorchooser
 root = tk.Tk()
 csv_file = "time_record.csv" #保存するファイルの名前と場所
 config_file = "config.ini"
+
+pygame.init()
+pygame.mixer.init()
+
+BGM1 = "notice_sound/BGM1.mp3"
+BGM2 = "notice_sound/BGM2.mp3"
+BGM3 = "notice_sound/BGM3.mp3"
+BGM4 = "notice_sound/BGM4.mp3"
 
 class App:
     def __init__(self,root):
@@ -41,8 +50,11 @@ class App:
         self.after_id = None
         self.message_window_count_id = None
         self.mute_status = self.config.getboolean("User_Setting", "mute_status") #ミュートかどうか
-        self.selected_status = tk.BooleanVar()
-        self.selected_status.set(self.mute_status)
+        self.is_mute = tk.BooleanVar()
+        self.is_mute.set(self.mute_status)
+        self.loop_status = self.config.get("User_Setting", "is_loop")
+        self.is_loop = tk.BooleanVar()
+        self.is_loop.set(self.loop_status)
         self.date = None    #タイマー開始時の日付
         self.start_datetime = None  #記録のサイクルのキーに使う
         self.stop_datetime = None 
@@ -51,6 +63,7 @@ class App:
         self.selected_color1 = None #色変更用の一時保存のデータ
         self.selected_color2 = None
         self.placed_widgets = []
+        self.setting_snapshot = None
         #ウィンドウが閉じるときの動作
         self.root.protocol("WM_DELETE_WINDOW",self.app_end) #保存機能が出来れば、終了時に保存するようにする
         #スタイル
@@ -108,16 +121,13 @@ class App:
         #過去ログ読み込み
         self.read_csv()
 
-    def read_config(self):
+    def read_config(self): #コンフィグファイルを読み込む
         if not os.path.exists(config_file):
             print("ファイルがないです")
             return
         try:
             with open(config_file, encoding="UTF-8") as f:
                 self.config.read_file(f)
-            print("ファイルがあります") #後で消すテスト表示
-            print(self.config["DEFAULT"]["work_time"]+"基本の設定です") #後で消すテスト表示
-            print(self.config["User_Setting"]["work_time"]+"カスタムの設定です") #後で消すテスト表示
         except FileNotFoundError:
             print("ファイルがありません")
         except UnicodeDecodeError as e:
@@ -130,8 +140,6 @@ class App:
             if self.cycle_count is None:
                 self.cycle_count = self.timer_cycle
 
-            #timer_duration = self.work_time * 60 if self.cycle_count % 2 == 0 else self.break_time * 60
-
             timer_duration = self.get_duration()
 
             self.countDown(timer_duration)
@@ -139,7 +147,7 @@ class App:
             self.start_datetime = self.get_current_time()
             self.date = self.get_current_date()
 
-    def get_duration(self): #お試し
+    def get_duration(self): #作業時間か休憩時間かを判断して
         if self.cycle_count % 2 == 0:
             self.log_color = "Work"
             return self.work_time * 60
@@ -240,20 +248,36 @@ class App:
     def send_message(self):
         self.message_window = tk.Toplevel(root)
         self.message_window.title("確認")
-        self.message_window.protocol("WM_DELETE_WINDOW",self.stop_timer_cycle)
-        self.notice_sound()
-        message_label = ttk.Label(self.message_window, text="5秒後にタイマーが開始します")
-        message_label2 = ttk.Label(self.message_window, text="ボタンを押すと停止します")
-        message_buton = ttk.Button(self.message_window,text="停止",command=lambda :self.stop_timer_cycle())
+        self.message_window.protocol("WM_DELETE_WINDOW",self.stop_timer_cycle) #ウィンドウ削除時の処理
+        self.check_mute_status()
+        #BGMのループ分岐を入れる
+        loop = self.is_loop.get()
+        if loop:
+            #Trueなら自分で止めるまで動くように
+            loop_message_label1 = ttk.Label(self.message_window, text="時間になりました")
+            loop_message_label2 = ttk.Label(self.message_window, text="次のタイマーを実行するか選択してください")
+            loop_message_buton1 = ttk.Button(self.message_window, text="タイマー停止", command=lambda :self.stop_timer_cycle())
+            loop_message_buton2 = ttk.Button(self.message_window, text="タイマー実行", command=self.start_next_timer)
+            
+            loop_message_label1.pack()
+            loop_message_label2.pack()
+            loop_message_buton1.pack()
+            loop_message_buton2.pack()
+        else:
+            count_message_label1 = ttk.Label(self.message_window, text="5秒後にタイマーが開始します")
+            count_message_label2 = ttk.Label(self.message_window, text="ボタンを押すと停止します")
+            count_message_buton1 = ttk.Button(self.message_window,text="停止",command=lambda :self.stop_timer_cycle())
 
-        message_label.pack()
-        message_label2.pack()
-        message_buton.pack()
-        self.start_next_timer_count(self.message_window_time,message_label)
+            count_message_label1.pack()
+            count_message_label2.pack()
+            count_message_buton1.pack()
+            self.start_next_timer_count(self.message_window_time,count_message_label1)
 
     def stop_timer_cycle(self):  #メッセージウィンドウを消し、カウントダウンを止める
-        self.message_window.destroy()                           #メッセージウィンドウを消す
-        self.root.after_cancel(self.message_window_count_id)    #メッセージウィンドウのカウントを止める
+        if self.is_loop.get() is False:
+            self.root.after_cancel(self.message_window_count_id)    #メッセージウィンドウのカウントを止める
+        self.message_window.destroy()                               #メッセージウィンドウを消す
+        pygame.mixer.music.stop()                                   #音声再生を止める
         self.reset()
 
     def start_next_timer_count(self,count,label):
@@ -261,9 +285,13 @@ class App:
             label["text"] = f"{count}秒後にタイマーが開始します"
             self.message_window_count_id = self.root.after(1000,self.start_next_timer_count,count -1,label)
         else:
-            self.message_window.destroy()
-            self.toggle_button_label("counting")
-            self.start_timer()
+            self.start_next_timer()
+    
+    def start_next_timer(self):
+        pygame.mixer.music.stop()  #音声再生を止める
+        self.message_window.destroy()
+        self.toggle_button_label("counting")
+        self.start_timer()
     #設定ウィンドウ
     def call_setting_window(self):
         if self.setting_window is None or not self.setting_window.winfo_exists():
@@ -273,7 +301,7 @@ class App:
             self.setting_window.lift()
             self.setting_window.focus_force()
 
-    def create_setting_window(self):
+    def create_setting_window(self): #設定ウィンドウ作成　タブ作成
         self.setting_window = tk.Toplevel(root)
         self.setting_window.title("設定")
         self.setting_window.geometry("500x300+0+0")
@@ -292,29 +320,29 @@ class App:
         setting_button3.place(relx=0, rely=0.4, relwidth=1, relheight=0.2)
         setting_button4.place(relx=0, rely=0.6, relwidth=1, relheight=0.2)
         #初期表示
+        self.get_setting_snapshot()
         self.place_notice_tab(setting_frame_R)
         #ウィンドウを一つのみにするための設定
         self.setting_window.protocol("WM_DELETE_WINDOW", self.setting_window_close)
         #タイマー時間の設定
 
-    def place_notice_tab(self,setting_frame_R): #ミュート機能のタブを生成
+    def place_notice_tab(self,setting_frame_R): #通知機能のタブを生成
+        self.check_changed()
         self.delete_tab()
-        mute_setting_label = ttk.Label(setting_frame_R, text="通知方法を選択してください", style="setting_notice_tab_header.TLabel")
-        radio1 = ttk.Radiobutton(
-                                setting_frame_R,
-                                variable=self.selected_status,
-                                style="setting_notice_tab_radiobutton.TRadiobutton",
-                                text="通知のみ",
-                                value=True,
-                                command=lambda:self.config.set("User_Setting","mute_status","True"))
-        radio2 = ttk.Radiobutton(
-                                setting_frame_R,
-                                variable=self.selected_status,
-                                style="setting_notice_tab_radiobutton.TRadiobutton",
-                                text="通知音あり",
-                                value=False,
-                                command=lambda:self.config.set("User_Setting","mute_status","False"))
-        display_time_label_left = ttk.Label(setting_frame_R, text="通知ウィンドウの表示時間", style="setting_notice_tab_header.TLabel")
+        mute_setting_label = ttk.Label(setting_frame_R, text="通知音の有無を選択してください", style="setting_notice_tab_header.TLabel")
+        mute_radio1 = ttk.Radiobutton(setting_frame_R,
+                                      variable=self.is_mute,
+                                      style="setting_notice_tab_radiobutton.TRadiobutton",
+                                      text="通知音なし",
+                                      value=True,
+                                      command=lambda:self.config.set("User_Setting","mute_status","True"))
+        mute_radio2 = ttk.Radiobutton(setting_frame_R,
+                                      variable=self.is_mute,
+                                      style="setting_notice_tab_radiobutton.TRadiobutton",
+                                      text="通知音あり",
+                                      value=False,
+                                      command=lambda:self.config.set("User_Setting","mute_status","False"))
+        display_time_label_left = ttk.Label(setting_frame_R, text="次にタイマーまでの時間", style="setting_notice_tab_header.TLabel")
         display_time_label_center = ttk.Label(setting_frame_R, text=self.message_window_time, style="setting_notice_tab_header.TLabel")
         display_time_label_right = ttk.Label(setting_frame_R, text="秒", style="setting_notice_tab_header.TLabel")
         display_time_scale = ttk.Scale(setting_frame_R,
@@ -323,24 +351,46 @@ class App:
                                        orient="horizontal",
                                        command=lambda event=None : self.change_scale(display_time_label_center, display_time_scale, "User_Setting", "message_window_time"))
         display_time_scale.set(str(self.message_window_time))
+        loop_setting_label = ttk.Label(setting_frame_R, text="次のタイマーを自動開始")
+        loop_radio1 = ttk.Radiobutton(setting_frame_R,
+                                      variable=self.is_loop,
+                                      style="setting_notice_tab_radiobutton.TRadiobutton",
+                                      text="ON",
+                                      value=False,
+                                      command=lambda:self.config.set("User_Setting","is_loop","False"))
+        loop_radio2 = ttk.Radiobutton(setting_frame_R,
+                                      variable=self.is_loop,
+                                      style="setting_notice_tab_radiobutton.TRadiobutton",
+                                      text="OFF",
+                                      value=True,
+                                      command=lambda:self.config.set("User_Setting","is_loop","True"))
+
 
         mute_setting_label.place(relx=0, rely=0, relwidth=1, relheight=0.1)
-        radio1.place(relx=0, rely=0.1, relwidth=0.5, relheight=0.2)
-        radio2.place(relx=0.5, rely=0.1, relwidth=0.5, relheight=0.2)
+        mute_radio1.place(relx=0, rely=0.1, relwidth=0.5, relheight=0.2)
+        mute_radio2.place(relx=0.5, rely=0.1, relwidth=0.5, relheight=0.2)
         display_time_label_left.place(relx=0, rely=0.3, relwidth=0.7, relheight=0.1)
         display_time_label_center.place(relx=0.7, rely=0.3, relwidth=0.2, relheight=0.1)
         display_time_label_right.place(relx=0.9, rely=0.3, relwidth=0.1, relheight=0.1)
         display_time_scale.place(relx=0, rely=0.4, relwidth=1, relheight=0.1)
+        loop_setting_label.place(relx=0, rely=0.5, relwidth=1, relheight=0.1)
+        loop_radio1.place(relx=0, rely=0.6, relwidth=0.5, relheight=0.2)
+        loop_radio2.place(relx=0.5, rely=0.6, relwidth=0.5, relheight=0.2)
+
         self.placed_widgets.append(mute_setting_label)
-        self.placed_widgets.append(radio1)
-        self.placed_widgets.append(radio2)
+        self.placed_widgets.append(mute_radio1)
+        self.placed_widgets.append(mute_radio2)
         self.placed_widgets.append(display_time_label_left)
         self.placed_widgets.append(display_time_label_center)
         self.placed_widgets.append(display_time_label_right)
         self.placed_widgets.append(display_time_scale)
+        self.placed_widgets.append(loop_setting_label)
+        self.placed_widgets.append(loop_radio1)
+        self.placed_widgets.append(loop_radio2)
         self.place_setting_button(setting_frame_R)
 
     def place_pomodoro_tab(self,setting_frame_R): #タイマーに関する設定タブを生成
+        self.check_changed()
         self.delete_tab()
         #サイクル
         cycle_label_left = ttk.Label(setting_frame_R, text="サイクル", style="setting_label.TLabel")
@@ -398,7 +448,8 @@ class App:
         self.placed_widgets.append(break_time_scale)
         self.place_setting_button(setting_frame_R)
 
-    def place_display_tab(self,setting_frame_R):
+    def place_display_tab(self,setting_frame_R): #表示設定のタブを生成
+        self.check_changed()
         self.delete_tab()
         work_time_color_label = ttk.Label(setting_frame_R, text="作業時間の背景色", style="setting_label.TLabel")
         self.work_time_color_before_sample = ttk.Label(setting_frame_R, borderwidth=5, relief="solid", text="今の色", anchor="center")
@@ -433,7 +484,8 @@ class App:
         self.placed_widgets.append(break_color_selection_button)
         self.place_setting_button(setting_frame_R)
 
-    def place_reset_tab(self,setting_flame_R):
+    def place_reset_tab(self,setting_flame_R): #リセット機能のタブを生成
+        self.check_changed()
         self.delete_tab()
         reset_label1 = ttk.Label(setting_flame_R, style="small.TLabel", text="通知ウィンドウの表示時間")
         reset_label2 = ttk.Label(setting_flame_R, style="small.TLabel", text="サイクル")
@@ -476,14 +528,13 @@ class App:
         self.placed_widgets.append(reset_button5)
         self.placed_widgets.append(reset_button6)
 
-    def setting_reset(self, target):
+    def setting_reset(self, target): #設定をデフォルトに戻す
         default_data = self.config.get("DEFAULT",target)
         print(target +":"+ default_data)
         self.config.set("User_Setting", target, default_data)
         self.setting_save()
 
-
-    def selecting_color(self, preview, current_mode):
+    def selecting_color(self, preview, current_mode): #カラーパレットから色を選びプレビューに反映
         color_code = colorchooser.askcolor(title="色を選択してください")
         if color_code[1]:
             if current_mode == "work":
@@ -521,6 +572,7 @@ class App:
             self.config.write(f)
         self.apply_setting()
         self.apply_tag_color()
+        self.get_setting_snapshot()
 
     def delete_tab(self): #タブを削除
         for w in self.placed_widgets:
@@ -528,28 +580,87 @@ class App:
 
     def setting_window_close(self):
         self.setting_window.destroy()
+        self.apply_setting()
         self.setting_window = None
         self.placed_widgets = []
+        self.setting_snapshot = None
+
+    def get_setting_snapshot(self): #設定変更時に保存
+        self.setting_snapshot = {
+            "work_time":self.config.getint("User_Setting", "work_time"),
+            "break_time":self.config.getint("User_Setting", "break_time"),
+            "pause_limit_time":self.config.getint("User_Setting", "pause_limit_time"),
+            "timer_cycle":self.config.getint("User_Setting", "timer_cycle"),
+            "message_window_time":self.config.getint("User_Setting", "message_window_time"),
+            "mute_status":self.config.getboolean("User_Setting", "mute_status"),
+            "default_color":self.config.get("User_Setting", "default_color"),
+            "work_color":self.config.get("User_Setting", "work_color"),
+            "break_color":self.config.get("User_Setting", "break_color"),
+            "is_loop":self.config.get("User_Setting", "is_loop")
+        }
+
+    def rollback_to_snapshot(self): #スナップショットを利用してロールバックする
+        for key , value in self.setting_snapshot.items():
+            self.config.set("User_Setting", key, str(value))
+        self.is_mute.set(self.mute_status)
+        self.is_loop.set(self.loop_status)
+
+    def load_config(self): #今の設定からデータを取得
+        return[
+            self.config.getint("User_Setting", "work_time"),
+            self.config.getint("User_Setting", "break_time"),
+            self.config.getint("User_Setting", "pause_limit_time"),
+            self.config.getint("User_Setting", "timer_cycle"),
+            self.config.getint("User_Setting", "message_window_time"),
+            self.config.getboolean("User_Setting", "mute_status"),
+            self.config.get("User_Setting", "default_color"),
+            self.config.get("User_Setting", "work_color"),
+            self.config.get("User_Setting", "break_color"),
+            self.config.get("User_Setting", "is_loop")
+        ]
+    
+    def check_changed(self): #設定未変更を検知
+        snapshot_list = list(self.setting_snapshot.values())
+        current_setting_data = self.load_config()
+        if snapshot_list == current_setting_data:
+            print("変更はありません")
+        else:
+            result = messagebox.askyesno("確認", "保存していない設定があります\n設定を保存しますか", parent=self.setting_window)
+            if result: #設定を保存し　スナップショットを更新する
+                self.setting_save()
+            else:
+                self.rollback_to_snapshot()
 
     def apply_setting(self): #設定ファイルから再読み込み
-        self.work_time = self.config.getint("User_Setting", "work_time")  #タイマー時間
+        self.work_time = self.config.getint("User_Setting", "work_time")
         self.break_time = self.config.getint("User_Setting", "break_time")  #休憩時間
         self.pose_limit = self.config.getint("User_Setting", "pause_limit_time") #ポーズ中リセットまでのタイムリミット
         self.timer_cycle = self.config.getint("User_Setting", "timer_cycle") #何回タイマーを繰り返すか
         self.message_window_time = self.config.getint("User_Setting", "message_window_time")
         self.mute_status = self.config.getboolean("User_Setting", "mute_status") #ミュートかどうか
+        self.is_mute.set(self.mute_status)
         self.default_color = self.config.get("User_Setting", "default_color")
         self.work_color = self.config.get("User_Setting", "work_color")
         self.break_color = self.config.get("User_Setting", "break_color")
+        self.loop_status = self.config.get("User_Setting", "is_loop")
+        self.is_loop.set(self.loop_status)
 
-    def notice_sound(self): #通知音の判別
-        selected = self.selected_status.get()
-        print(selected)
-        if selected:
-            print("時間です")
+    def check_mute_status(self): #通知音を判別
+        mute = self.is_mute.get()
+        if mute:
+            print("時間です--Mute ON--")
         else:
-            print("ミュートじゃないです")
-            self.message_window.bell()
+            print("時間です--MUte OFF")
+            self.play_sound_notice()
+
+    def play_sound_notice(self): #音楽を再生
+        #通知音のが音楽かシンプルかの判定を入れる
+        pygame.mixer.music.load(BGM4)
+        loop = self.is_loop.get()
+        if loop:
+            pygame.mixer.music.play(-1)
+        else:
+            pygame.mixer.music.play()
 
     def get_current_time(self): #現在時刻を所得して返す機能
         current_time = datetime.now()
