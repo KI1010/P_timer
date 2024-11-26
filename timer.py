@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import csv
 import configparser
@@ -11,16 +12,24 @@ from tkinter import ttk
 from tkinter import colorchooser
 
 root = tk.Tk()
-csv_file = "time_record.csv" #保存するファイルの名前と場所
-config_file = "config.ini"
+def resource_path(relative_path):
+    #正しいパスを取得
+    if getattr(sys, 'frozen', False):  # PyInstallerでパッケージ化されている場合
+        base_path = sys._MEIPASS  # リソースファイルは一時的に解凍されている
+    else:  # スクリプトが通常の状態で実行されている場合
+        base_path = os.path.abspath(".")  # カレントディレクトリ
+    return os.path.join(base_path, relative_path)  # パスを結合して返す
+csv_file = resource_path("time_record.csv") #保存するファイルの名前と場所
+config_file = resource_path("config.ini")
+window_icon = resource_path("タイマーアイコン.ico")
 
 pygame.init()
 pygame.mixer.init()
 
-BGM1 = "notice_sound/BGM1.mp3"
-BGM2 = "notice_sound/BGM2.mp3"
-BGM3 = "notice_sound/BGM3.mp3"
-BGM4 = "notice_sound/BGM4.mp3"
+BGM1 = resource_path("notice_sound/BGM1.mp3")
+BGM2 = resource_path("notice_sound/BGM2.mp3")
+BGM3 = resource_path("notice_sound/BGM3.mp3")
+BGM4 = resource_path("notice_sound/BGM4.mp3")
 
 class App:
     def __init__(self,root):
@@ -44,7 +53,7 @@ class App:
         self.pose_id = None
         self.root.resizable(False,False)
         self.root.overrideredirect(False)
-        self.root.iconbitmap("C:/Users/DCITEX/Desktop/py_ren/pt/P_timer/タイマーアイコン.ico")
+        self.root.iconbitmap(window_icon)
         self.state_pose = False
         self.now_count = None
         self.after_id = None
@@ -123,7 +132,7 @@ class App:
 
     def read_config(self): #コンフィグファイルを読み込む
         if not os.path.exists(config_file):
-            print("ファイルがないです")
+            print("コンフィグファイルがないです")
             return
         try:
             with open(config_file, encoding="UTF-8") as f:
@@ -579,11 +588,13 @@ class App:
             w.place_forget()
 
     def setting_window_close(self):
+        self.check_changed()
         self.setting_window.destroy()
         self.apply_setting()
         self.setting_window = None
         self.placed_widgets = []
         self.setting_snapshot = None
+        #設定位置の修正
 
     def get_setting_snapshot(self): #設定変更時に保存
         self.setting_snapshot = {
